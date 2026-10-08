@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from '../../../lib/supabaseClient';
+import HotspotEditor from './HotspotEditor';
 
 export default function TourEditorPage() {
   const { tourId } = useParams();
@@ -13,6 +14,7 @@ export default function TourEditorPage() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
+  const [hotspotPanorama, setHotspotPanorama] = useState(null);
 
   const load = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -149,12 +151,23 @@ export default function TourEditorPage() {
               value={p.room_name}
               onChange={(e) => renameRoom(p.id, e.target.value)}
             />
+            <button className="btn btn-secondary" onClick={() => setHotspotPanorama(p)}>
+              Стрелки
+            </button>
             <button className="btn btn-secondary" onClick={() => deletePanorama(p)}>
               Удалить
             </button>
           </div>
         </div>
       ))}
+
+      {hotspotPanorama && (
+        <HotspotEditor
+          panorama={hotspotPanorama}
+          allPanoramas={panoramas}
+          onClose={() => setHotspotPanorama(null)}
+        />
+      )}
     </div>
   );
 }

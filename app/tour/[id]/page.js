@@ -13,6 +13,7 @@ export default function PublicTourPage() {
   const [activeId, setActiveId] = useState(null);
   const [error, setError] = useState('');
   const [libReady, setLibReady] = useState(false);
+  const scenesRef = useRef(null);
 
   useEffect(() => {
     async function load() {
@@ -27,35 +28,67 @@ export default function PublicTourPage() {
         return;
       }
       setTour(tourData);
+
       const { data: panoData } = await supabase
         .from('panoramas')
         .select('*')
         .eq('tour_id', id)
         .order('sort_order', { ascending: true });
-      setPanoramas(panoData || []);
-      if (panoData && panoData.length > 0) setActiveId(panoData[0].id);
+      const list = panoData || [];
+      setPanoramas(list);
+
+      const panoramaIds = list.map((p) => p.id);
+      const { data: hotspotData } = panoramaIds.length
+        ? await supabase.from('hotspots').select('*').in('from_panorama_id', panoramaIds)
+        : { data: [] };
+
+      // Build Pannellum's "scenes" config: one scene per room, with
+      // clickable arrow hotspots that jump to another scene.
+      const scenes = {};
+      for (const p of list) {
+        const url = supabase.storage.from('panoramas').getPublicUrl(p.storage_path).data.publicUrl;
+        const hotSpots = (hotspotData || [])
+          .filter((h) => h.from_panorama_id === p.id)
+          .map((h) => ({
+            pitch: h.pitch,
+            yaw: h.yaw,
+            type: 'scene',
+            sceneId: h.target_panorama_id,
+            text: list.find((x) => x.id === h.target_panorama_id)?.room_name || '',
+            cssClass: 'tour-hotspot',
+          }));
+        scenes[p.id] = {
+          type: 'equirectangular',
+          panorama: url,
+          hotSpots,
+        };
+      }
+      scenesRef.current = scenes;
+
+      if (list.length > 0) setActiveId(list[0].id);
     }
     load();
   }, [id]);
 
   useEffect(() => {
-    if (!libReady || panoramas.length === 0 || !activeId) return;
-    const active = panoramas.find((p) => p.id === activeId);
-    if (!active) return;
-    const url = supabase.storage.from('panoramas').getPublicUrl(active.storage_path).data.publicUrl;
-
+    if (!libReady || !scenesRef.current || !activeId) return;
     if (pannellumRef.current) {
       pannellumRef.current.destroy();
     }
     // eslint-disable-next-line no-undef
     pannellumRef.current = pannellum.viewer(viewerRef.current, {
-      type: 'equirectangular',
-      panorama: url,
-      autoLoad: true,
+      default: { firstScene: activeId, sceneFadeDuration: 800 },
+      scenes: scenesRef.current,
       compass: false,
       showZoomCtrl: true,
     });
-  }, [libReady, activeId, panoramas]);
+    pannellumRef.current.on('scenechange', (sceneId) => setActiveId(sceneId));
+  }, [libReady]);
+
+  function goToScene(sceneId) {
+    if (pannellumRef.current) pannellumRef.current.loadScene(sceneId);
+    setActiveId(sceneId);
+  }
 
   if (error) {
     return <div className="container error">{error}</div>;
@@ -74,6 +107,17 @@ export default function PublicTourPage() {
         src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"
         onLoad={() => setLibReady(true)}
       />
+      <style>{`
+        .tour-hotspot {
+          width: 44px;
+          height: 44px;
+          background: rgba(110,168,254,0.9);
+          border-radius: 50%;
+          border: 2px solid #fff;
+          cursor: pointer;
+        }
+        .tour-hotspot:hover { background: #6ea8fe; }
+      `}</style>
       <div style={{ position: 'fixed', inset: 0, background: '#000' }}>
         <div ref={viewerRef} style={{ position: 'absolute', inset: 0 }} />
         <div
@@ -108,7 +152,7 @@ export default function PublicTourPage() {
           {panoramas.map((p) => (
             <button
               key={p.id}
-              onClick={() => setActiveId(p.id)}
+              onClick={() => goToScene(p.id)}
               style={{
                 whiteSpace: 'nowrap',
                 padding: '8px 14px',
