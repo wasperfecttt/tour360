@@ -1,0 +1,23 @@
+{
+  "name": "tour360",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.4",
+    "@supabase/auth-helpers-nextjs": "^0.10.0",
+    "next": "14.2.15",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "eslint": "^8",
+    "eslint-config-next": "14.2.15"
+  }
+}
